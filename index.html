@@ -151,9 +151,9 @@ function ballTouchingWall(spellBall, rocks){
 }    
    
 function launchBall(){
-    spellBall = spellBall.create(player.x, player.y, 'spellBall');
-    spellBall.setVelocityX(300);
-    spellBall.body.setAllowGravity(false);
+    newBall = spellBall.create(player.x, player.y, 'spellBall');
+    newBall.setVelocityX(300);
+    newBall.body.setAllowGravity(false);
 }    
     
 function onIce(){
