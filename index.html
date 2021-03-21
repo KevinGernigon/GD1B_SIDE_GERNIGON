@@ -217,8 +217,8 @@ function onSnow(){
     speed = 0.5;
 }    
     
-function getDash(){
-    superboost.setVisible(false);
+function getDash(player, superboost){
+    superboost.disableBody(true, true);
     canDash = true;
 }    
     
