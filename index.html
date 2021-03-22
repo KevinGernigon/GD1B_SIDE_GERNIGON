@@ -41,6 +41,7 @@ var canUseSpell = false;
 var spellAnim = true;
 var spellBall;
 var bossDoor = true;
+var canUseLaser = true;
 
 var game = new Phaser.Game(config);
 
@@ -54,6 +55,11 @@ function preload ()
     this.load.image('spellBall', 'assets/spell.png');
     this.load.image('spellBoost', 'assets/spellboost.png');
     this.load.image('open_door', 'assets/unlock_boss.png');
+    this.load.image('boss_door', 'assets/boss_door.png');
+    this.load.image('boss', 'assets/boss.png');
+    this.load.spritesheet('boss_charge', 'assets/boss_spritesheet.png', {frameWidth: 233, frameHeight: 279});
+    this.load.image('boss_laser', 'assets/boss_laser.png');
+    this.load.image('background', 'assets/background.jpg');
 }
 
 function create ()
@@ -62,15 +68,24 @@ function create ()
     //const backgroundImage = this.add.image(0,0, 'background').setOrigin(0, 0);
     /*this.cameras.main.setBounds(0, 0, 1280 * 2, 720 * 2);
     this.physics.world.setBounds(0, 0, 1280 * 2, 720 * 2);*/
+    this.add.image(1920, 720, 'background');
     const map = this.make.tilemap({key: 'map'});
     const tileset = map.addTilesetImage('tileset', 'tiles');
     const rocks = map.createStaticLayer('rocks', tileset, 0, 0);
     const icy_rocks = map.createStaticLayer('icy_rocks', tileset, 0, 0);
     const spikes = map.createStaticLayer('spikes', tileset, 0, 0);
     const snow = map.createStaticLayer('snow', tileset, 0, 0);
-    boss_door = map.createDynamicLayer('boss_door', tileset, 0, 0);
+    
+    boss_door = this.physics.add.group();
+    //boss_door = map.createDynamicLayer('boss_door', tileset, 0, 0);
     //const ennemies = map.createStaticLayer('ennemies', tileset, 0, 0);
     spellBall = this.physics.add.group();
+    boss = this.physics.add.group();
+    boss_laser = this.physics.add.group();
+    
+    new_door = boss_door.create(2290, 828, 'boss_door');
+    new_door.body.setAllowGravity(false);   
+    new_door.body.setImmovable(true);
     
     
     //power-ups
@@ -81,13 +96,15 @@ function create ()
     spellBoost.create(1225, 700, 'spellBoost').setScale(0.3).refreshBody();
     open_door.create(1370, 1295, 'open_door').setScale(0.3).refreshBody();
     
-    
+    ennemy_boss = this.physics.add.sprite(3620, 950, 'boss_charge');
+    ennemy_boss.body.setAllowGravity(false);   
+    ennemy_boss.body.setImmovable(true);
     // setting collisions
     rocks.setCollisionByExclusion(-1, true);
     icy_rocks.setCollisionByExclusion(-1, true);
     spikes.setCollisionByExclusion(-1, true);
     snow.setCollisionByExclusion(-1, true);
-    boss_door.setCollisionByExclusion(-1, true);
+    //boss_door.setCollisionByExclusion(-1, true);
     
     
     player = this.physics.add.sprite(150, 1250, 'dude');
@@ -96,9 +113,11 @@ function create ()
     //icy_rocks.setFriction(0,1);
     
     
-    //animations
+    //camera
     this.cameras.main.startFollow(player);
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
+    
+    //animations
     this.anims.create({
         key: 'left',
         frames: this.anims.generateFrameNumbers('dude', { start: 0, end: 5 }),
@@ -141,13 +160,19 @@ function create ()
     this.anims.create({
         key: 'spell',
         frames: this.anims.generateFrameNumbers('dude', {start: 13, end: 15})
-    })
+    });
     
     this.anims.create({
         key: 'idle',
         frames: this.anims.generateFrameNumbers('dude', {start: 22, end: 24}),
         frameRate: 10,
         repeat: -1
+    });
+    
+    this.anims.create({
+        key: "boss_charging",
+        frames: this.anims.generateFrameNumbers('boss_charge', {start: 0, end: 6}),
+        frameRate: 1
     });
     
     //cursors = this.input.keyboard.createCursorKeys();
@@ -159,19 +184,30 @@ function create ()
     this.physics.add.collider(player, snow, onSnow);
     this.physics.add.collider(player, rocks, onGround);
     this.physics.add.collider(player, icy_rocks, onIce);
-    this.physics.add.collider(player, spikes/*, getSpiked*/);
+    this.physics.add.collider(player, spikes, getSpiked);
     this.physics.add.overlap(player, superboost, getDash);
     this.physics.add.overlap(player, spellBoost, getSpell);
-    this.physics.add.overlap(player, open_door, unlockDoor);
-    this.physics.add.collider(spellBall, rocks, ballTouchingWall, null, this);
-    this.physics.add.collider(player, boss_door/*, getTileId*/);
+    this.physics.add.overlap(player, open_door, removeDoor);
+    /*this.physics.add.overlap(spellBall, rocks, ballTouchingRocks, null, this);
+    this.physics.add.overlap(spellBall, new_door, ballTouchingDoor, null, this);*/
+    this.physics.add.collider(spellBall, rocks, ballTouchingRocks, null, this);
+    this.physics.add.collider(spellBall, new_door, ballTouchingDoor, null, this);
+    this.physics.add.collider(player, new_door);
+    this.physics.add.overlap(player, boss_laser, getGrilled);
+    //this.physics.add.collider(player, boss_door/*, getTileId*/);
 }
 
 /*function getTileId(player, boss_door){
     console.log(boss_door.index);
 }  */  
 
-// get a spell bu overlapping with spellboost
+    
+//when you end up being a grill for the boss
+function getGrilled(player, boss_laser){
+    console.log('dead');
+}
+    
+// get a spell by overlapping with spellboost
 function getSpell(player, spellBoost){
     spellBoost.disableBody(true, true);
     canUseSpell = true;
@@ -179,19 +215,20 @@ function getSpell(player, spellBoost){
     
     
 // remove boss door    
-function unlockDoor(player, open_door){
-    open_door.disableBody(true, true);
-    //map.destroyLayer('boss_door');
-    //destroy(boss_door);
-    //boss_door.removeTileAt(20,54);
-    //boss_door.removeTileAt(32,13);
+function removeDoor(player, open_door){
+    new_door.destroy();
+    open_door.destroy();
 }    
 
 //removes spell ball when it touches a rock        
-function ballTouchingWall(spellBall, rocks){
-    spellBall.disableBody(true, true);
+function ballTouchingRocks(spellBall, rocks){
+    spellBall.destroy();
+} 
+    
+function ballTouchingDoor(new_door, spellBall){
+    spellBall.destroy();
 }    
-   
+     
 // spell    
 function launchBall(){
     newBall = spellBall.create(player.x + 114, player.y, 'spellBall');
@@ -201,7 +238,7 @@ function launchBall(){
  
 //makes player unable to control the character when on Ice    
 function onIce(){
-    console.log('onIce');
+    //console.log('onIce');
     if (keys.RIGHT.isDown && canMove){
         player.setVelocityX(300);
     }
@@ -234,19 +271,19 @@ function onIce(){
     
 //resets controls to the character when on Ground    
 function onGround(){
-    console.log('onGround');
+    //console.log('onGround');
     setTimeout(function(){canMove = true}, 200);
     setTimeout(function(){canJump = true}, 500);
     //setTimeout(function(){speed = 1}, 500);
 }
     
-/*function getSpiked(){
-    return;
-}   */ 
+function getSpiked(){
+    console.log('dead');
+}    
    
 // slows the player    
 function onSnow(){
-    console.log('onSnow');
+    //console.log('onSnow');
     /*player.setVelocityX(0);
     if (keys.LEFT.isDown && !player.body.blocked.left && canMove)
     {
@@ -359,6 +396,31 @@ function update ()
         spellAnim = false;
         setTimeout(function(){canUseSpell = true}, 1000);
         setTimeout(function(){spellAnim = true}, 1000);
+    }
+    
+    //when character enters boss area
+    if (player.x >= 2930 && canUseLaser){
+        canUseLaser = false;
+        ennemy_boss.anims.play('boss_charging', true);
+        setTimeout(function(){
+            newLaser = boss_laser.create(ennemy_boss.x - 200, ennemy_boss.y, 'boss_laser');
+            newLaser.body.setAllowGravity(false)
+        }, 5000);
+        setTimeout(function(){newLaser.setScale(2, 1, 0)}, 5500);
+        setTimeout(function(){newLaser.setPosition(newLaser.x - 36, newLaser.y)}, 5500);
+        setTimeout(function(){newLaser.setScale(4, 1, 0)}, 6000);
+        setTimeout(function(){newLaser.setPosition(newLaser.x - (36*2), newLaser.y)}, 6000);
+        setTimeout(function(){newLaser.setScale(8, 1, 0)}, 6500);
+        setTimeout(function(){newLaser.setPosition(newLaser.x - (36*4), newLaser.y)}, 6500);
+        setTimeout(function(){newLaser.setScale(16, 1, 0)}, 7000);
+        setTimeout(function(){
+            newLaser.setPosition(newLaser.x - (36*8), newLaser.y);
+            newLaser.setVelocityX(-1000);
+        }, 7000);
+        setTimeout(function(){
+            newLaser.destroy();
+            canUseLaser = true;
+        }, 10000)
     }
     
 }
