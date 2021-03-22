@@ -37,8 +37,10 @@ var speed = 1;
 var canJump = true;
 var canMove = true;
 var canDash = false;
-var canUseSpell = true;
+var canUseSpell = false;
+var spellAnim = true;
 var spellBall;
+var bossDoor = true;
 
 var game = new Phaser.Game(config);
 
@@ -50,6 +52,8 @@ function preload ()
     this.load.tilemapTiledJSON('map', 'map.json');
     this.load.spritesheet('dude', 'assets/spritesheet_4.png', { frameWidth: 114, frameHeight: 104 });
     this.load.image('spellBall', 'assets/spell.png');
+    this.load.image('spellBoost', 'assets/spellboost.png');
+    this.load.image('open_door', 'assets/unlock_boss.png');
 }
 
 function create ()
@@ -61,19 +65,29 @@ function create ()
     const map = this.make.tilemap({key: 'map'});
     const tileset = map.addTilesetImage('tileset', 'tiles');
     const rocks = map.createStaticLayer('rocks', tileset, 0, 0);
-    const icy_rocks = map.createStaticLayer('icy_rocks', tileset, 0, 0)
+    const icy_rocks = map.createStaticLayer('icy_rocks', tileset, 0, 0);
     const spikes = map.createStaticLayer('spikes', tileset, 0, 0);
     const snow = map.createStaticLayer('snow', tileset, 0, 0);
+    boss_door = map.createDynamicLayer('boss_door', tileset, 0, 0);
     //const ennemies = map.createStaticLayer('ennemies', tileset, 0, 0);
-    superboost = this.physics.add.staticGroup();
     spellBall = this.physics.add.group();
+    
+    
+    //power-ups
+    superboost = this.physics.add.staticGroup();
+    spellBoost = this.physics.add.staticGroup();
+    open_door = this.physics.add.staticGroup();
     superboost.create(800, 150, 'superboost').setScale(0.3).refreshBody();
+    spellBoost.create(1225, 700, 'spellBoost').setScale(0.3).refreshBody();
+    open_door.create(1370, 1295, 'open_door').setScale(0.3).refreshBody();
     
     
+    // setting collisions
     rocks.setCollisionByExclusion(-1, true);
     icy_rocks.setCollisionByExclusion(-1, true);
     spikes.setCollisionByExclusion(-1, true);
     snow.setCollisionByExclusion(-1, true);
+    boss_door.setCollisionByExclusion(-1, true);
     
     
     player = this.physics.add.sprite(150, 1250, 'dude');
@@ -81,6 +95,8 @@ function create ()
     
     //icy_rocks.setFriction(0,1);
     
+    
+    //animations
     this.cameras.main.startFollow(player);
     this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
     this.anims.create({
@@ -138,24 +154,52 @@ function create ()
     keys = this.input.keyboard.addKeys('UP, DOWN, LEFT, RIGHT, SPACE, E');
     //spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     
+    
+    //collisions
     this.physics.add.collider(player, snow, onSnow);
     this.physics.add.collider(player, rocks, onGround);
     this.physics.add.collider(player, icy_rocks, onIce);
     this.physics.add.collider(player, spikes/*, getSpiked*/);
     this.physics.add.overlap(player, superboost, getDash);
+    this.physics.add.overlap(player, spellBoost, getSpell);
+    this.physics.add.overlap(player, open_door, unlockDoor);
     this.physics.add.collider(spellBall, rocks, ballTouchingWall, null, this);
+    this.physics.add.collider(player, boss_door/*, getTileId*/);
 }
 
+/*function getTileId(player, boss_door){
+    console.log(boss_door.index);
+}  */  
+
+// get a spell bu overlapping with spellboost
+function getSpell(player, spellBoost){
+    spellBoost.disableBody(true, true);
+    canUseSpell = true;
+}    
+    
+    
+// remove boss door    
+function unlockDoor(player, open_door){
+    open_door.disableBody(true, true);
+    map.destroyLayer('boss_door');
+    //destroy(boss_door);
+    boss_door.removeTileAt(20,54);
+    //boss_door.removeTileAt(32,13);
+}    
+
+//removes spell ball when it touches a rock        
 function ballTouchingWall(spellBall, rocks){
     spellBall.disableBody(true, true);
 }    
    
+// spell    
 function launchBall(){
     newBall = spellBall.create(player.x + 114, player.y, 'spellBall');
     newBall.setVelocityX(300);
     newBall.body.setAllowGravity(false);
 }    
-    
+ 
+//makes player unable to control the character when on Ice    
 function onIce(){
     console.log('onIce');
     if (keys.RIGHT.isDown && canMove){
@@ -188,6 +232,7 @@ function onIce(){
     }
 }
     
+//resets controls to the character when on Ground    
 function onGround(){
     console.log('onGround');
     setTimeout(function(){canMove = true}, 200);
@@ -198,7 +243,8 @@ function onGround(){
 /*function getSpiked(){
     return;
 }   */ 
-    
+   
+// slows the player    
 function onSnow(){
     console.log('onSnow');
     /*player.setVelocityX(0);
@@ -216,7 +262,8 @@ function onSnow(){
     }*/
     speed = 0.5;
 }    
-    
+
+// give the player the ability to dash when overlapping with superboost    
 function getDash(player, superboost){
     superboost.disableBody(true, true);
     canDash = true;
@@ -225,7 +272,7 @@ function getDash(player, superboost){
 function update ()
 {
     
-    
+    //character movement
     if (keys.LEFT.isDown && !player.body.blocked.left && canMove)
     {
         player.setVelocityX(-300 * speed);
@@ -240,7 +287,7 @@ function update ()
             player.anims.play('right', true);
         }
     }
-    else if (player.body.onFloor() && canMove && canUseSpell)
+    else if (player.body.onFloor() && canMove && spellAnim)
     {
         player.setVelocityX(0);
 
@@ -300,6 +347,7 @@ function update ()
         speed = 1;
     }
     
+    //using spell
     if(keys.E.isDown && canUseSpell){
         player.anims.play('spell', true);
         console.log('spell');
@@ -308,7 +356,9 @@ function update ()
         spellBall.setVelocityX(300);
         spellBall.body.setAllowGravity(false);*/
         canUseSpell = false;
+        spellAnim = false;
         setTimeout(function(){canUseSpell = true}, 1000);
+        setTimeout(function(){spellAnim = true}, 1000);
     }
     
 }
