@@ -46,8 +46,8 @@ var player_life_value = 3;
 var invincible = false;
 var ennemy_boss_life = 3;
 var bossIsAlive = true;
-var playerIsAlive = true;
-    
+var playerIsAlive = false;
+var justGotSpell = true;
 var game = new Phaser.Game(config);
 
 function preload ()
@@ -64,9 +64,11 @@ function preload ()
     this.load.image('boss', 'assets/boss.png');
     this.load.spritesheet('boss_charge', 'assets/boss_spritesheet.png', {frameWidth: 233, frameHeight: 279});
     this.load.image('boss_laser', 'assets/boss_laser.png');
-    this.load.image('background', 'assets/background.jpg');
+    this.load.image('background', 'assets/background_2.jpg');
     this.load.image('heart', 'assets/heart.png');
     this.load.image('broken_heart', 'assets/broken_heart.png');
+    this.load.image('ecran_accueil', 'assets/ecran_accueil.jpg');
+    this.load.spritesheet('spell_cooldown', 'assets/spell_cooldown_spritesheet.png', {frameWidth: 200, frameHeight: 200});
 }
 
 function create ()
@@ -125,9 +127,14 @@ function create ()
     
     
     player = this.physics.add.sprite(150, 1250, 'dude');
+    
+    show_cooldown = this.add.sprite(80, 600, 'spell_cooldown').setScrollFactor(0);
+    show_cooldown.setScale(0.6);
+    show_cooldown.setVisible(false);
     //player.setCollideWorldBounds(true);
     
     //icy_rocks.setFriction(0,1);
+    ecran_accueil = this.add.image(640, 360, 'ecran_accueil').setScrollFactor(0);
     
     
     //camera
@@ -195,12 +202,18 @@ function create ()
     this.anims.create({
         key: 'player_death',
         frames: this.anims.generateFrameNumbers('dude', {start: 25, end: 28}),
-        framerate: 1,
+        frameRate: 2,
         repeat: 0
     });
     
+    this.anims.create({
+        key: 'spell_on_cooldown',
+        frames: this.anims.generateFrameNumbers('spell_cooldown', {start: 1, end: 5}),
+        frameRate: 1
+    })
+    
     //cursors = this.input.keyboard.createCursorKeys();
-    keys = this.input.keyboard.addKeys('UP, DOWN, LEFT, RIGHT, SPACE, E');
+    keys = this.input.keyboard.addKeys('UP, DOWN, LEFT, RIGHT, SPACE, E, ENTER');
     //spacebar = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     
     
@@ -219,6 +232,7 @@ function create ()
     this.physics.add.collider(spellBall, ennemy_boss, damageToBoss, ballOnBoss)
     this.physics.add.collider(player, new_door);
     this.physics.add.overlap(player, boss_laser, getGrilled);
+    this.physics.add.collider(player, ennemy_boss, doNotTouch);
     //this.physics.add.collider(player, boss_door/*, getTileId*/);
 }
 
@@ -226,12 +240,18 @@ function create ()
     console.log(boss_door.index);
 }  */  
 
-//defeated the boss
+//destroying spell when colliding with boss
 function ballOnBoss(ennemy_boss, spellBall){
     spellBall.destroy();
 }    
+
     
+//when player collides with the boss
+function doNotTouch(player, ennemy_boss){
+    player_life_value = player_life_value - 1;
+}
     
+//when boss gets hit by a spell    
 function damageToBoss(spellBall, ennemy_boss){
     if (ennemy_boss_life == 1){
         ennemy_boss_life = ennemy_boss_life -1;
@@ -251,17 +271,17 @@ function getGrilled(player, boss_laser){
     console.log('dead');
     if (!invincible){
         console.log('dead');
-        if (player_life_value == 1){
+        if (player_life_value == 1 && bossIsAlive){
             player_life_value = player_life_value - 1;
             player_life_left.destroy();
             setTimeout(function(){invincible = false}, 1000);
         }
-        if (player_life_value == 2){
+        if (player_life_value == 2 && bossIsAlive){
             player_life_value = player_life_value - 1;
             player_life_center.destroy();
             setTimeout(function(){invincible = false}, 1000);
         }
-        if (player_life_value == 3){
+        if (player_life_value == 3 && bossIsAlive){
             player_life_value = player_life_value - 1;
             player_life_right.destroy();     
             setTimeout(function(){invincible = false}, 1000);
@@ -274,6 +294,7 @@ function getGrilled(player, boss_laser){
 function getSpell(player, spellBoost){
     spellBoost.disableBody(true, true);
     canUseSpell = true;
+    setTimeout(function(){justGotSpell = false}, 100);
 }    
     
     
@@ -389,11 +410,30 @@ function getDash(player, superboost){
     
 function update ()
 {
+    //show spell cooldown when getting it
+    if (canUseSpell == true){
+        show_cooldown.setVisible(true);
+        this.add.text(1380, 800, 'Use E to use the spell.', {font: "28px Arial Black", fill: "#000"});
+    }
     
-    if (player_life_value == 2 && playerIsAlive){
+    if (canUseSpell == false && !justGotSpell){
+        show_cooldown.anims.play('spell_on_cooldown', true);
+    }
+    
+    if (canDash == true){
+        this.add.text(500, 100, 'Press SPACE to dash.', {font: "28px Arial Black", fill: "#000"});
+    }
+    
+    
+    if (keys.ENTER.isDown){
+        ecran_accueil.destroy();
+        playerIsAlive = true;
+    }
+    
+    if (player_life_value == 2){
         this.add.image(210,50, 'broken_heart').setScrollFactor(0);
     }
-    if (player_life_value == 1 && playerIsAlive){
+    if (player_life_value == 1){
         this.add.image(210,50, 'broken_heart').setScrollFactor(0);
         this.add.image(130,50, 'broken_heart').setScrollFactor(0);
     }
@@ -422,6 +462,7 @@ function update ()
         bossIsAlive = false;
         playerIsAlive = false;
         this.add.text(260, 280, 'Congratulations ! You won !', { font: "48px Arial Black", fill: "#000" }).setScrollFactor(0);
+        player.anims.play('idle', true);
     }
     //character movement
     if (playerIsAlive == true){
@@ -509,7 +550,7 @@ function update ()
             spellBall.body.setAllowGravity(false);*/
             canUseSpell = false;
             spellAnim = false;
-            setTimeout(function(){canUseSpell = true}, 1000);
+            setTimeout(function(){canUseSpell = true}, 5000);
             setTimeout(function(){spellAnim = true}, 1000);
         }
 
