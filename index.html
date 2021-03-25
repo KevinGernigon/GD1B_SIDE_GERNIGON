@@ -22,7 +22,7 @@ var config = {
         default: 'arcade',
         arcade: {
             gravity: { y: 300 },
-            debug: false
+            debug: true
         }
     },
     scene: {
@@ -33,10 +33,12 @@ var config = {
 };
 
 var player;
+var hasStarted = false;
 var speed = 1;
 var canJump = true;
 var canMove = true;
 var canDash = false;
+var canSlide = true;
 var canUseSpell = false;
 var spellAnim = true;
 var spellBall;
@@ -324,22 +326,22 @@ function launchBall(){
 function onIce(){
     //console.log('onIce');
     if (keys.RIGHT.isDown && canMove){
-        player.setVelocityX(300);
+        player.setAccelerationX(200);
     }
     if (keys.LEFT.isDown && canMove){
-        player.setVelocityX(-300);
+        player.setAccelerationX(-200);
     }
-    player.setVelocityX * 1;
+    player.setAccelerationX(400);
     canMove = false;
     canJump = false;
     if (player.body.velocity == 0){
         if (keys.RIGHT.isDown && canSlide){
-            player.setVelocityX (400);
+            player.setAccelerationX (200);
             canSlide = false;
             setTimeout(function(){canSlide = true}, 1000);
         }
         if (keys.LEFT.isDown && canSlide){
-            player.setVelocityX (-400);
+            player.setAccelerationX (-400);
             canSlide = false;
             setTimeout(function(){canSlide = true}, 1000);
         }
@@ -357,7 +359,10 @@ function onIce(){
 function onGround(){
     //console.log('onGround');
     setTimeout(function(){canMove = true}, 200);
-    setTimeout(function(){canJump = true}, 500);
+    setTimeout(function(){
+        canJump = true;
+        player.setAccelerationX(0)
+    }, 500);
     //setTimeout(function(){speed = 1}, 500);
 }
     
@@ -425,9 +430,10 @@ function update ()
     }
     
     
-    if (keys.ENTER.isDown){
+    if (keys.ENTER.isDown && !hasStarted){
         ecran_accueil.destroy();
         playerIsAlive = true;
+        hasStarted = true;
     }
     
     if (player_life_value == 2){
@@ -550,7 +556,7 @@ function update ()
             spellBall.body.setAllowGravity(false);*/
             canUseSpell = false;
             spellAnim = false;
-            setTimeout(function(){canUseSpell = true}, 5000);
+            setTimeout(function(){canUseSpell = true}, 4000);
             setTimeout(function(){spellAnim = true}, 1000);
         }
 
